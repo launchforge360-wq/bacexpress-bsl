@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npx:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(vercel --version)",
+      "Bash(npm list:*)",
+      "Read(//c/Users/js_bi/AppData/Local/**)",
+      "Read(//c/Program Files/**)",
+      "Bash(where gh:*)",
+      "Bash(winget --version)",
+      "Bash(choco --version)",
+      "Bash(winget install:*)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"Initial commit - BacExpress BSL:*)"
+    ]
+  }
+}
