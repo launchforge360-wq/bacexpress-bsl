@@ -2,6 +2,19 @@
 
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { FORFAITS, SEMAINE_SUP_PRIX } from "@/config/forfaits";
+
+const FORFAIT_OPTIONS = [
+  { value: "studio", label: `Forfait Studio – ${FORFAITS.studio.boites} boîtes – ${FORFAITS.studio.prix}$` },
+  { value: "appartement", label: `Forfait Appartement – ${FORFAITS.appartement.boites} boîtes – ${FORFAITS.appartement.prix}$` },
+  { value: "maison", label: `Forfait Maison – ${FORFAITS.maison.boites} boîtes – ${FORFAITS.maison.prix}$` },
+];
+
+function getPrixTotal(forfaitId: string, semainessup: string): number {
+  const f = FORFAITS[forfaitId as keyof typeof FORFAITS];
+  if (!f) return 0;
+  return f.prix + Number(semainessup) * SEMAINE_SUP_PRIX;
+}
 
 function ReservationFormInner() {
   const searchParams = useSearchParams();
@@ -18,11 +31,12 @@ function ReservationFormInner() {
     semainessup: "0",
     message: "",
   });
-  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
@@ -32,37 +46,43 @@ function ReservationFormInner() {
     setError("");
 
     try {
-      const res = await fetch("/api/reservation", {
+      const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          forfaitId: form.forfait,
+          semainessup: Number(form.semainessup),
+          nom: form.nom,
+          courriel: form.courriel,
+          telephone: form.telephone,
+          adresse: form.adresse,
+          ville: form.ville,
+          datesouhaitee: form.datesouhaitee,
+          message: form.message,
+        }),
       });
 
-      if (!res.ok) throw new Error("Erreur lors de l'envoi");
-      setSubmitted(true);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Une erreur est survenue.");
+        return;
+      }
+
+      // Redirection vers Stripe Checkout
+      window.location.href = data.url;
     } catch {
-      setError("Une erreur est survenue. Veuillez réessayer ou nous contacter directement.");
+      setError("Erreur de connexion. Veuillez réessayer.");
     } finally {
       setLoading(false);
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="bg-white rounded-2xl p-10 shadow text-center">
-        <div className="text-5xl mb-4">✅</div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Demande envoyée!</h2>
-        <p className="text-gray-600">
-          Merci {form.nom}! Nous avons bien reçu votre demande de réservation et nous vous
-          contacterons dans les <strong>24 heures</strong> pour confirmer votre date.
-        </p>
-      </div>
-    );
-  }
+  const prixTotal = getPrixTotal(form.forfait, form.semainessup);
 
   return (
     <div className="bg-white rounded-2xl p-8 shadow">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Demande de réservation</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">Réserver et payer en ligne</h2>
 
       {error && (
         <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg px-4 py-3 mb-6 text-sm">
@@ -77,12 +97,8 @@ function ReservationFormInner() {
             Nom complet <span className="text-red-500">*</span>
           </label>
           <input
-            id="nom"
-            name="nom"
-            type="text"
-            required
-            value={form.nom}
-            onChange={handleChange}
+            id="nom" name="nom" type="text" required
+            value={form.nom} onChange={handleChange}
             placeholder="Jean Tremblay"
             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
           />
@@ -95,12 +111,8 @@ function ReservationFormInner() {
               Téléphone <span className="text-red-500">*</span>
             </label>
             <input
-              id="telephone"
-              name="telephone"
-              type="tel"
-              required
-              value={form.telephone}
-              onChange={handleChange}
+              id="telephone" name="telephone" type="tel" required
+              value={form.telephone} onChange={handleChange}
               placeholder="418 xxx-xxxx"
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
@@ -110,12 +122,8 @@ function ReservationFormInner() {
               Courriel <span className="text-red-500">*</span>
             </label>
             <input
-              id="courriel"
-              name="courriel"
-              type="email"
-              required
-              value={form.courriel}
-              onChange={handleChange}
+              id="courriel" name="courriel" type="email" required
+              value={form.courriel} onChange={handleChange}
               placeholder="jean@exemple.com"
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
@@ -128,12 +136,8 @@ function ReservationFormInner() {
             Adresse de livraison <span className="text-red-500">*</span>
           </label>
           <input
-            id="adresse"
-            name="adresse"
-            type="text"
-            required
-            value={form.adresse}
-            onChange={handleChange}
+            id="adresse" name="adresse" type="text" required
+            value={form.adresse} onChange={handleChange}
             placeholder="123 rue Principale"
             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
           />
@@ -145,11 +149,8 @@ function ReservationFormInner() {
             Ville <span className="text-red-500">*</span>
           </label>
           <select
-            id="ville"
-            name="ville"
-            required
-            value={form.ville}
-            onChange={handleChange}
+            id="ville" name="ville" required
+            value={form.ville} onChange={handleChange}
             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
           >
             <option value="">-- Choisir une ville --</option>
@@ -166,12 +167,8 @@ function ReservationFormInner() {
             Date de livraison souhaitée <span className="text-red-500">*</span>
           </label>
           <input
-            id="datesouhaitee"
-            name="datesouhaitee"
-            type="date"
-            required
-            value={form.datesouhaitee}
-            onChange={handleChange}
+            id="datesouhaitee" name="datesouhaitee" type="date" required
+            value={form.datesouhaitee} onChange={handleChange}
             min={new Date().toISOString().split("T")[0]}
             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
           />
@@ -183,36 +180,31 @@ function ReservationFormInner() {
             Forfait <span className="text-red-500">*</span>
           </label>
           <select
-            id="forfait"
-            name="forfait"
-            required
-            value={form.forfait}
-            onChange={handleChange}
+            id="forfait" name="forfait" required
+            value={form.forfait} onChange={handleChange}
             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
           >
             <option value="">-- Choisir un forfait --</option>
-            <option value="studio">Forfait Studio – 20 boîtes – 79$</option>
-            <option value="appartement">Forfait Appartement – 35 boîtes – 109$</option>
-            <option value="maison">Forfait Maison – 50 boîtes – 149$</option>
+            {FORFAIT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
           </select>
         </div>
 
         {/* Semaines supp */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="semainessup">
-            Semaines supplémentaires (25$ chacune)
+            Semaines supplémentaires ({SEMAINE_SUP_PRIX}$ chacune)
           </label>
           <select
-            id="semainessup"
-            name="semainessup"
-            value={form.semainessup}
-            onChange={handleChange}
+            id="semainessup" name="semainessup"
+            value={form.semainessup} onChange={handleChange}
             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
           >
             <option value="0">Aucune semaine supplémentaire</option>
-            <option value="1">+1 semaine (+25$)</option>
-            <option value="2">+2 semaines (+50$)</option>
-            <option value="3">+3 semaines (+75$)</option>
+            <option value="1">+1 semaine (+{SEMAINE_SUP_PRIX}$)</option>
+            <option value="2">+2 semaines (+{SEMAINE_SUP_PRIX * 2}$)</option>
+            <option value="3">+3 semaines (+{SEMAINE_SUP_PRIX * 3}$)</option>
           </select>
         </div>
 
@@ -222,27 +214,47 @@ function ReservationFormInner() {
             Message ou précisions (optionnel)
           </label>
           <textarea
-            id="message"
-            name="message"
-            rows={3}
-            value={form.message}
-            onChange={handleChange}
+            id="message" name="message" rows={3}
+            value={form.message} onChange={handleChange}
             placeholder="Ex: appartement au 3e étage, code d'accès, heure préférée..."
             className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
           />
         </div>
 
+        {/* Récapitulatif prix */}
+        {prixTotal > 0 && (
+          <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+            <div className="flex items-center justify-between">
+              <span className="text-green-800 font-medium">Total à payer</span>
+              <span className="text-2xl font-extrabold text-green-700">{prixTotal}$</span>
+            </div>
+            <p className="text-green-600 text-xs mt-1">Paiement sécurisé via Stripe · TPS/TVQ incluses</p>
+          </div>
+        )}
+
         <button
           type="submit"
-          disabled={loading}
-          className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-bold py-3.5 rounded-xl text-lg transition-colors"
+          disabled={loading || !form.forfait}
+          className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-bold py-4 rounded-xl text-lg transition-colors flex items-center justify-center gap-2"
         >
-          {loading ? "Envoi en cours..." : "Envoyer ma demande de réservation"}
+          {loading ? (
+            <span>Redirection vers le paiement...</span>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              Payer {prixTotal > 0 ? `${prixTotal}$` : ""} en ligne
+            </>
+          )}
         </button>
 
-        <p className="text-xs text-gray-400 text-center">
-          Nous vous contacterons dans les 24 heures pour confirmer votre réservation.
-        </p>
+        <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          Paiement 100% sécurisé par Stripe
+        </div>
       </form>
     </div>
   );
@@ -250,7 +262,11 @@ function ReservationFormInner() {
 
 export default function ReservationForm() {
   return (
-    <Suspense fallback={<div className="bg-white rounded-2xl p-8 shadow text-center text-gray-400">Chargement...</div>}>
+    <Suspense fallback={
+      <div className="bg-white rounded-2xl p-8 shadow text-center text-gray-400">
+        Chargement...
+      </div>
+    }>
       <ReservationFormInner />
     </Suspense>
   );
