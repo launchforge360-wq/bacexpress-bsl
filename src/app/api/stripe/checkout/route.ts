@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { FORFAITS, SEMAINE_SUP_PRIX, type ForfaitId } from "@/config/forfaits";
 import { getInventaire } from "@/lib/inventaire";
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       message: message || "",
     };
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: lineItems,
       mode: "payment",

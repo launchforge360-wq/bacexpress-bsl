@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { FORFAITS, SEMAINE_SUP_PRIX, type ForfaitId } from "@/config/forfaits";
 import { decrementerInventaire } from "@/lib/inventaire";
 import { envoyerConfirmationReservation } from "@/lib/email";
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+    event = getStripe().webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
     console.error("[Webhook] Signature invalide:", err);
     return NextResponse.json({ error: "Signature invalide." }, { status: 400 });
