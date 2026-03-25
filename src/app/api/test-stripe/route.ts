@@ -1,22 +1,17 @@
 import { NextResponse } from "next/server";
+import { getStripe } from "@/lib/stripe";
 
 export async function GET() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return NextResponse.json({ error: "Clé manquante" });
-
-  // Test direct fetch vers Stripe sans SDK
   try {
-    const res = await fetch("https://api.stripe.com/v1/payment_methods?limit=1", {
-      headers: { Authorization: `Bearer ${key}` },
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.create({
+      line_items: [{ price_data: { currency: "cad", product_data: { name: "Test" }, unit_amount: 100 }, quantity: 1 }],
+      mode: "payment",
+      success_url: "https://bacexpress.vercel.app/paiement/succes",
+      cancel_url: "https://bacexpress.vercel.app/paiement/annule",
     });
-    const data = await res.json();
-    return NextResponse.json({
-      keyPrefix: key.slice(0, 12) + "...",
-      stripeStatus: res.status,
-      stripeOk: res.ok,
-      object: data.object,
-    });
+    return NextResponse.json({ ok: true, url: session.url?.slice(0, 50) });
   } catch (err) {
-    return NextResponse.json({ fetchError: String(err) });
+    return NextResponse.json({ error: String(err), type: err instanceof Error ? err.constructor.name : "unknown" });
   }
 }
