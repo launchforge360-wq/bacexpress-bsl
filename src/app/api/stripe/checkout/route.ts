@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       console.warn("[Inventaire] Erreur lecture inventaire, on continue:", invErr);
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://bacexpress.vercel.app";
+    const siteUrl = process.env.SITE_URL || "https://bacexpress.vercel.app";
     const semaines = Number(semainessup);
 
     const lineItems = [
