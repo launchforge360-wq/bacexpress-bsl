@@ -14,20 +14,24 @@ export async function POST(request: NextRequest) {
 
     const forfait = FORFAITS[forfaitId as ForfaitId];
 
-    // Vérifier l'inventaire
-    const dispo = await getInventaire(forfaitId as ForfaitId);
-    if (dispo <= 0) {
-      return NextResponse.json(
-        { error: "Ce forfait n'est plus disponible pour le moment. Contactez-nous." },
-        { status: 409 }
-      );
+    // Vérifier l'inventaire (avec fallback si KV non disponible)
+    try {
+      const dispo = await getInventaire(forfaitId as ForfaitId);
+      if (dispo <= 0) {
+        return NextResponse.json(
+          { error: "Ce forfait n'est plus disponible pour le moment. Contactez-nous." },
+          { status: 409 }
+        );
+      }
+    } catch (invErr) {
+      // Inventaire non disponible — on continue quand même
+      console.warn("[Inventaire] Erreur lecture inventaire, on continue:", invErr);
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://bacexpress.vercel.app";
     const semaines = Number(semainessup);
 
-    // Construire les line items
-    const lineItems: { price_data: { currency: string; product_data: { name: string; description: string }; unit_amount: number }; quantity: number }[] = [
+    const lineItems = [
       {
         price_data: {
           currency: "cad",
@@ -35,27 +39,27 @@ export async function POST(request: NextRequest) {
             name: forfait.nom,
             description: forfait.description,
           },
-          unit_amount: forfait.prix * 100, // Stripe utilise les centimes
+          unit_amount: forfait.prix * 100,
         },
         quantity: 1,
       },
+      ...(semaines > 0
+        ? [
+            {
+              price_data: {
+                currency: "cad",
+                product_data: {
+                  name: "Semaine(s) supplémentaire(s)",
+                  description: `+${semaines} semaine(s) à ${SEMAINE_SUP_PRIX}$/semaine`,
+                },
+                unit_amount: SEMAINE_SUP_PRIX * 100,
+              },
+              quantity: semaines,
+            },
+          ]
+        : []),
     ];
 
-    if (semaines > 0) {
-      lineItems.push({
-        price_data: {
-          currency: "cad",
-          product_data: {
-            name: `Semaine(s) supplémentaire(s)`,
-            description: `+${semaines} semaine(s) à ${SEMAINE_SUP_PRIX}$/semaine`,
-          },
-          unit_amount: SEMAINE_SUP_PRIX * 100,
-        },
-        quantity: semaines,
-      });
-    }
-
-    // Métadonnées pour le webhook
     const metadata: Record<string, string> = {
       forfaitId,
       nom: nom || "",
@@ -69,7 +73,6 @@ export async function POST(request: NextRequest) {
     };
 
     const session = await getStripe().checkout.sessions.create({
-      payment_method_types: ["card"],
       line_items: lineItems,
       mode: "payment",
       locale: "fr",
@@ -77,14 +80,13 @@ export async function POST(request: NextRequest) {
       success_url: `${siteUrl}/paiement/succes?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/paiement/annule`,
       metadata,
-      payment_intent_data: {
-        metadata,
-      },
+      payment_intent_data: { metadata },
     });
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    console.error("Erreur checkout Stripe:", err);
-    return NextResponse.json({ error: "Erreur lors de la création du paiement." }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Erreur checkout Stripe:", message);
+    return NextResponse.json({ error: "Erreur lors de la création du paiement.", detail: message }, { status: 500 });
   }
 }
