@@ -8,7 +8,7 @@
 
 // Pour utiliser votre propre domaine, vérifiez-le sur resend.com/domains
 // puis remplacez la valeur ci-dessous par : "BacExpress BSL <noreply@boitededemenagement.ca>"
-const FROM_EMAIL = "BacExpress BSL <onboarding@resend.dev>";
+const FROM_EMAIL = "BacExpress BSL <noreply@boitededemenagement.ca>";
 
 interface ConfirmationEmailData {
   nom: string;
@@ -36,7 +36,8 @@ async function sendEmail(to: string, subject: string, html: string) {
   if (!res.ok) {
     const err = await res.text();
     console.error(`[Resend] Erreur envoi à ${to}:`, err);
-    throw new Error(`Resend error: ${err}`);
+    // Ne pas bloquer le flux — le paiement est déjà confirmé
+    return null;
   }
   return res.json();
 }
